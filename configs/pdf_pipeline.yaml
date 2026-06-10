@@ -1,0 +1,142 @@
+# PDF 解析与 chunk 构建总配置。
+pdf:
+  # PDF 解析器选择；可选 pdfplumber / opendataloader。
+  # opendataloader 只作为结构预解析层；正文读取和双栏修复仍由 pdfplumber 完成，避免阅读顺序错位污染 chunk。
+  parser: opendataloader
+  # Master switch for figure/table parsing in pdf->chunk.
+  # true parses/links/OCRs figures and tables; false parses text only.
+  isTable: true
+  # Skip PDFs whose extracted full text is unusably garbled before chunking.
+  skip_if_garbled_text:
+    enabled: true
+    min_text_chars: 80
+    max_cjk_ratio: 0.02
+    min_ascii_letter_ratio: 0.20
+    min_readable_ratio: 0.55
+    max_weird_ratio: 0.35
+    max_mojibake_ratio: 0.08
+
+  # OpenDataLoader 结构预解析配置。
+  opendataloader:
+    # OpenDataLoader 命令行程序名称。
+    command: opendataloader-pdf
+    # OpenDataLoader 结构化解析产物输出目录。
+    output_dir: data/processed_pages/opendataloader
+    # OpenDataLoader 输出格式，多个格式用逗号分隔。
+    formats: json,markdown
+    # OpenDataLoader 单个 PDF 解析超时时间，单位秒。
+    timeout_seconds: 600
+    # 传给 OpenDataLoader 的额外命令行参数列表。
+    extra_args: []
+
+  # 是否启用 pdfplumber 双栏阅读顺序修复。
+  enable_double_column: true
+  # 是否启用表格抽取。
+  enable_table_extraction: true
+  # 是否启用旧版图片说明 stub 开关；当前会与 OCR 模型增强逻辑兼容。
+  enable_image_caption_stub: true
+  # 是否启用旧版英文翻译 stub 开关；当前会与翻译模型增强逻辑兼容。
+  enable_english_translation_stub: true
+  # 是否启用英文段落翻译模型；semantic_section_llm.enabled=true 时翻译由复筛 LLM 完成，此处保持 false 可避免重复调用。
+  enable_english_translation_model: false
+  # 是否启用整页图片 OCR/图像理解模型增强。
+  enable_ocr_model: true
+  # LLM 配置文件路径，用于翻译、OCR 和语义复筛等模型调用。
+  llm_config: configs/llm.yaml
+  # 整页 OCR 模式下每页最多送入模型识别的图片数量。
+  max_images_per_page: 1
+
+  # 单位指数局部 OCR 校正配置，用于恢复 PDF 中容易丢失的上标/指数单位。
+  unit_exponent_ocr_recovery:
+    # 是否启用单位指数局部 OCR 校正。
+    enabled: true
+    # PDF 局部区域渲染倍率；倍率越高越清晰但越慢。
+    render_scale: 4
+    # 裁剪 OCR 区域时向四周扩展的像素 padding。
+    crop_padding: 6
+    # Tesseract OCR 语言组合。
+    languages: chi_sim+eng
+    # Tesseract page segmentation mode 候选值。
+    psm_values: [6, 11]
+    # OCR 无法恢复指数时，是否允许从上下文文本兜底推断。
+    allow_context_fallback: false
+
+  # 是否用本地 Tesseract 兜底抽取 pdfplumber 缺失的高价值文本，如章节标题和推荐意见；不将整页 OCR 注入 chunk。
+  ocr_missing_high_value_text: true
+  # 是否在 chunk 生成前跳过整页 OCR；关联图表 OCR 会在图表关联后按需执行。
+  skip_full_page_ocr_before_chunk: true
+
+  # 语义章节 LLM 复筛配置，用于噪声剔除和英文译中文。
+  semantic_section_llm:
+    # 是否启用语义章节 LLM 复筛。
+    enabled: true
+    # 送入语义章节复筛模型的最大输入字符数。
+    max_input_chars: 120000
+    # 语义章节复筛模型最大输出字符数；用于拦截正文回显、cleaned_text 或额外解释。
+    max_output_chars: 12000
+
+  # Dual TOC pipeline: rule parser and first-layer LLM parser run as peers,
+  # then an optional second-layer LLM judge merges candidates. Local validation
+  # and quality scoring still decide what can be written into chunks.
+  toc_llm_pipeline:
+    enabled: true
+    first_layer_llm:
+      enabled: true
+      max_input_chars: 120000
+    judge_llm:
+      enabled: true
+
+  # 图表与 chunk 关联配置。
+  figure_table_linking:
+    # 是否启用图表对象与 chunk 的关联。
+    enabled: true
+    # 是否返回页面布局信息，供图表关联和后续调试使用。
+    return_layout: true
+    # 是否通过正文中的显式图表引用进行关联。
+    link_by_explicit_reference: true
+    # 是否通过版面距离和重叠关系进行图表邻近关联。
+    link_by_layout_proximity: true
+    # 图题搜索的最大垂直距离阈值。
+    caption_search_distance: 90
+    # 表注/图注说明搜索的最大垂直距离阈值。
+    note_search_distance: 120
+    # 版面邻近关联的最大垂直距离阈值。
+    proximity_vertical_threshold: 120
+    # 版面邻近关联要求的最小水平重叠比例。
+    proximity_horizontal_overlap_threshold: 0.30
+    # 单个 chunk 最多关联的图表对象数量。
+    max_linked_objects_per_chunk: 3
+    # 识别为图对象的最小宽度。
+    min_figure_width: 80
+    # 识别为图对象的最小高度。
+    min_figure_height: 80
+
+  # 关联图表对象 OCR/视觉理解配置。
+  figure_table_ocr:
+    # 是否启用关联图表对象 OCR/视觉理解。
+    enabled: false
+    # 是否只对已关联到 chunk 的图表对象做 OCR。
+    only_linked_objects: true
+    # 是否将 [FIGURE_CONTENT] 追加到对象所在页的 pages[*].text；不修改已生成的 chunk 文本。
+    inject_into_page_text: true
+    # 是否把图表 OCR/视觉理解结果作为独立 evidence 保存。
+    store_as_evidence: true
+    # 图表 OCR 渲染分辨率。
+    ocr_resolution: 150
+
+# 语义 chunk 切分配置。
+chunking:
+  # chunk 切分方法名称。
+  method: section_semantic_v1
+  # 单个 chunk 推荐最大字符数。
+  max_chars: 1200
+  # 单个 chunk 推荐最小字符数。
+  min_chars: 500
+  # 是否过滤非知识型章节，如参考文献、声明、致谢等。
+  filter_non_knowledge_section: true
+  # Chunk-level language/noise filter. Drops long chunks whose CJK character
+  # ratio is too low, typically English-only abstracts, references, or OCR noise.
+  chunk_language_filter:
+    enabled: true
+    min_chars: 80
+    min_cjk_ratio: 0.20

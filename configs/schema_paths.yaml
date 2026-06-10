@@ -1,0 +1,6 @@
+schemas:
+  page: schemas/page_schema.json
+  chunk: schemas/chunk_schema.json
+  lf_output: schemas/lf_output_schema.json
+  weak_signal: schemas/weak_signal_schema.json
+  weak_metrics: schemas/weak_metrics_schema.json

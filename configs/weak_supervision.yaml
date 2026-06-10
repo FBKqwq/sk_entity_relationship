@@ -1,0 +1,177 @@
+labels:
+  - diseases
+  - sub_diseases
+  - symptoms
+  - tests
+  - treatments
+  - plans
+  - etiologies
+  - pathogeneses
+
+active_labels:
+  - sub_diseases
+  - symptoms
+  - tests
+  - treatments
+  - plans
+  - etiologies
+  - pathogeneses
+
+lv1_prompted_llm:
+  enabled: true
+  prompts:
+    - name: semantic_presence
+      focus: 语义召回视角：判断 chunk 是否在医学语义上出现某类实体，即使表达不是词典原词也可以给出正票。
+      instruction: 适合发现同义表达、缩写、诊疗语义和跨句描述；必须给出原文 evidence，不确定时降低 confidence。
+    - name: evidence_anchor
+      focus: 证据锚定视角：只在 chunk 中存在清晰、可逐字定位的实体证据时给出正票。
+      instruction: 优先降低幻觉和误召回；evidence 必须是 chunk 原文连续片段，不能改写或概括。
+    - name: boundary_count
+      focus: 边界与数量视角：判断实体边界是否独立，并估计每类不同实体的数量。
+      instruction: 区分实体本体和关系/属性描述；不要把剂量、频率、阈值等属性误判为新的实体类型。
+
+graph:
+  entities:
+    diseases: Disease
+    sub_diseases: Sub_disease
+    symptoms: Symptom
+    tests: Test
+    treatments: Treatment
+    plans: Plan
+    etiologies: Etiology
+    pathogeneses: Pathogenesis
+  relations:
+    - source: Disease
+      relation: has_sub_disease
+      target: Sub_disease
+      name: 包含分型
+    - source: Sub_disease
+      relation: manifests_as
+      target: Symptom
+      name: 表现为
+    - source: Sub_disease
+      relation: requires_test
+      target: Test
+      name: 需要检查
+    - source: Sub_disease
+      relation: follows_treatment
+      target: Treatment
+      name: 遵循治疗原则
+    - source: Treatment
+      relation: implements_by
+      target: Plan
+      name: 落实为
+    - source: Sub_disease
+      relation: causes
+      target: Etiology
+      name: 由病因导致
+    - source: Sub_disease
+      relation: explained_by
+      target: Pathogenesis
+      name: 由机制解释
+
+fusion:
+  method: confidence_weighted_vote
+  min_confidence: 0.5
+
+lv1_vote_model:
+  method: manual_weighted_vote
+  alpha: 5.0
+  threshold:
+    sub_diseases: 0.35
+    symptoms: 0.30
+    tests: 0.30
+    treatments: 0.35
+    plans: 0.35
+    etiologies: 0.35
+    pathogeneses: 0.35
+  lf_weights:
+    lv1_chunk_medical_pattern: 1.2
+    lv1_chunk_prompted_llm: 1.1
+    lv1_chunk_prompted_llm_semantic_presence: 0.9
+    lv1_chunk_prompted_llm_evidence_anchor: 0.9
+    lv1_chunk_prompted_llm_boundary_count: 0.8
+    lv1_chunk_dictionary: 0.9
+    lv1_chunk_regex_indicator: 0.6
+    lv1_chunk_section_prior: 0.4
+  primary_lfs:
+    - lv1_chunk_medical_pattern
+    - lv1_chunk_prompted_llm
+    - lv1_chunk_prompted_llm_semantic_presence
+    - lv1_chunk_prompted_llm_evidence_anchor
+    - lv1_chunk_prompted_llm_boundary_count
+    - lv1_chunk_dictionary
+  auxiliary_lfs:
+    - lv1_chunk_regex_indicator
+    - lv1_chunk_section_prior
+
+lv1_count_model:
+  method: manual_count_fusion
+  min_count: 1
+  max_count:
+    sub_diseases: 5
+    symptoms: 30
+    tests: 30
+    treatments: 10
+    plans: 20
+    etiologies: 10
+    pathogeneses: 10
+  lf_weights:
+    lv1_chunk_medical_pattern: 1.2
+    lv1_chunk_prompted_llm: 0.9
+    lv1_chunk_prompted_llm_semantic_presence: 0.7
+    lv1_chunk_prompted_llm_evidence_anchor: 0.8
+    lv1_chunk_prompted_llm_boundary_count: 1.0
+    lv1_chunk_dictionary: 0.8
+    lv1_chunk_regex_indicator: 0.8
+    lv1_chunk_section_prior: 0.0
+  evidence_floor_lfs:
+    - lv1_chunk_medical_pattern
+    - lv1_chunk_dictionary
+    - lv1_chunk_regex_indicator
+
+dictionary:
+  symptom_terms:
+    - 发热
+    - 乏力
+    - 疼痛
+    - 皮疹
+  indicator_terms:
+    - CRP
+    - C反应蛋白
+    - PCT
+    - ESR
+    - 血沉
+    - 抗体
+  disease_terms:
+    - 综合征
+    - 疾病
+    - 感染性疾病
+    - 炎症性疾病
+  treatment_terms:
+    - 治疗原则
+    - 治疗方案
+    - 药物治疗
+  etiology_terms:
+    - 病因
+    - 病原体
+    - 感染因素
+    - 结石因素
+    - 自身免疫因素
+    - 肿瘤相关因素
+    - 危险因素
+    - 诱因
+  pathogenesis_terms:
+    - 发病机制
+    - 病理生理
+    - 炎症级联
+    - 免疫反应
+    - 结构改变
+    - 代谢改变
+
+llm_batching:
+  enabled: true
+  lv1_chunk_batch_size: 10
+  lv2_entity_batch_size: 20
+  max_chars_per_batch: 24000
+  retry_missing_items: true

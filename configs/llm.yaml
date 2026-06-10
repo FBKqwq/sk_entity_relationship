@@ -1,0 +1,25 @@
+teacher_llm:
+  enabled: true
+  provider: openai_compatible
+  model_name: "qwen3.7-max"
+  TR_model_name: "qwen3.7-max"
+  OCR_model_name: "qwen3.7-plus"
+  api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  api_key: "sk-a8bebe43354345f2ad3741d3970ec7e7"
+  api_key_env: ""
+  timeout: 800
+  max_retries: 3
+  temperature: 0.0
+  # DashScope 兼容接口要求 max_tokens ∈ [1, 32768]，取 32767 避免边界争议。
+  max_tokens: 32767
+  # DashScope/OpenAI-compatible extra_body.enable_thinking switch for deep-thinking models.
+  enable_thinking: true
+  thinking_budget: 81920
+  Full_extraction: false
+
+llm_batching:
+  enabled: true
+  lv1_chunk_batch_size: 10
+  lv2_entity_batch_size: 20
+  max_chars_per_batch: 24000
+  retry_missing_items: true

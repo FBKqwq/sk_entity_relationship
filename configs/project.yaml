@@ -1,0 +1,4 @@
+project_name: expert_consensus_kg
+root_dir: code
+stage: pdf_and_snorkel_weak_supervision
+random_seed: 42
